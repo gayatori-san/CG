@@ -1,0 +1,41 @@
+name: CG practicals build check
+
+on:
+  push:
+    paths:
+      - "cg/*.cpp"
+      - ".github/workflows/cg-build.yml"
+  workflow_dispatch:
+
+jobs:
+  build-and-smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OpenGL and virtual display dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++ freeglut3-dev xvfb
+      - name: Compile all nine practicals
+        run: |
+          set -e
+          mkdir -p build
+          for source in cg/*.cpp; do
+            name=$(basename "$source" .cpp)
+            echo "Building $source"
+            g++ -std=c++17 -Wall -Wextra "$source" -o "build/$name" -lglut -lGLU -lGL
+          done
+      - name: Smoke-test each graphical program
+        run: |
+          set -e
+          xvfb-run -a sh -c '
+            for program in build/*; do
+              echo "Launching $program"
+              status=0
+              timeout 2s "$program" || status=$?
+              if [ "$status" -ne 124 ] && [ "$status" -ne 0 ]; then
+                echo "$program crashed with exit code $status"
+                exit "$status"
+              fi
+            done
+          '
