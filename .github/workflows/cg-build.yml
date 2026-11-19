@@ -8,24 +8,24 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-smoke-test:
+  glut-only-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install OpenGL and virtual display dependencies
+      - name: Install compiler and GLUT development package
         run: |
           sudo apt-get update
           sudo apt-get install -y g++ freeglut3-dev xvfb
-      - name: Compile all nine practicals
+      - name: Compile using only g++ and GLUT
         run: |
           set -e
           mkdir -p build
           for source in cg/*.cpp; do
             name=$(basename "$source" .cpp)
-            echo "Building $source"
-            g++ -std=c++17 -Wall -Wextra "$source" -o "build/$name" -lglut -lGLU -lGL
+            echo "Building $source with -lglut only"
+            g++ -std=c++17 "$source" -o "build/$name" -lglut
           done
-      - name: Smoke-test each graphical program
+      - name: Launch each program
         run: |
           set -e
           xvfb-run -a sh -c '
@@ -34,7 +34,7 @@ jobs:
               status=0
               timeout 2s "$program" || status=$?
               if [ "$status" -ne 124 ] && [ "$status" -ne 0 ]; then
-                echo "$program crashed with exit code $status"
+                echo "$program exited with code $status"
                 exit "$status"
               fi
             done
