@@ -1,4 +1,6 @@
 #include <GL/glut.h>
+#include <vector>
+#include <utility>
 
 int xmin = 200, xmax = 440, ymin = 120, ymax = 360;
 
@@ -11,21 +13,46 @@ void drawShape() {
     glEnd();
 }
 
-void boundaryFill(int x, int y) {
-    unsigned char color[3];
-    glReadPixels(x, y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, color);
-    if (color[0] < 10 && color[1] < 10 && color[2] < 10) return;
-    if (color[0] > 240 && color[1] > 240 && color[2] > 240) {
+void boundaryFill(int startX, int startY) {
+    // Ignore clicks outside the triangle.
+    if (startY < ymin || startY > ymax) return;
+
+    float inset = (320.0f - xmin) * (startY - ymin) / (ymax - ymin);
+    int left = xmin + (int)inset;
+    int right = xmax - (int)inset;
+    if (startX < left || startX > right) return;
+
+    // Use an explicit stack instead of recursion to avoid stack overflow.
+    std::vector<std::pair<int, int>> pixels;
+    pixels.push_back({startX, startY});
+
+    while (!pixels.empty()) {
+        std::pair<int, int> point = pixels.back();
+        pixels.pop_back();
+
+        int x = point.first;
+        int y = point.second;
+        if (x < xmin || x > xmax || y < ymin || y > ymax) continue;
+
+        unsigned char color[3];
+        glReadPixels(x, y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, color);
+
+        // Stop at the black boundary and skip pixels already filled.
+        if (color[0] < 10 && color[1] < 10 && color[2] < 10) continue;
+        if (!(color[0] > 240 && color[1] > 240 && color[2] > 240)) continue;
+
         glColor3f(1, 0.5, 0);
         glBegin(GL_POINTS);
         glVertex2i(x, y);
         glEnd();
-        glFlush();
-        boundaryFill(x + 1, y);
-        boundaryFill(x - 1, y);
-        boundaryFill(x, y + 1);
-        boundaryFill(x, y - 1);
+
+        pixels.push_back({x + 1, y});
+        pixels.push_back({x - 1, y});
+        pixels.push_back({x, y + 1});
+        pixels.push_back({x, y - 1});
     }
+
+    glFlush();
 }
 
 void display() {
